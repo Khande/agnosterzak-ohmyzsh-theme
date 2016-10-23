@@ -87,47 +87,120 @@ prompt_context() {
 
 # Battery Level
 prompt_battery() {
-  HEART='♥ '
+    HEART='♥ '
+    
+    if [[ "$OSTYPE" = darwin* ]] ; then
 
-  if [[ $(uname) == "Linux"  ]] ; then
+        function battery_pct() {
+            local smart_battery_status="$(ioreg -rc "AppleSmartBattery")"
+            typeset -F maxcapacity=$(echo $smart_battery_status | grep '^.*"MaxCapacity"\ =\ ' | sed -e 's/^.*"MaxCapacity"\ =\ //')
+            typeset -F currentcapacity=$(echo $smart_battery_status | grep '^.*"CurrentCapacity"\ =\ ' | sed -e 's/^.*CurrentCapacity"\ =\ //')
+            integer i=$(((currentcapacity/maxcapacity) * 100))
+            echo $i
+        }
 
-    function battery_is_charging() {
-      ! [[ $(acpi 2&>/dev/null | grep -c '^Battery.*Discharging') -gt 0 ]]
-    }
+        function plugged_in() {
+            [ $(ioreg -rc AppleSmartBattery | grep -c '^.*"ExternalConnected"\ =\ Yes') -eq 1 ]
+        }
 
-    function battery_pct() {
-      if (( $+commands[acpi] )) ; then
-        echo "$(acpi | cut -f2 -d ',' | tr -cd '[:digit:]')"
-      fi
-    }
+        function battery_pct_remaining() {
+            if plugged_in ; then
+                echo "External Power"
+            else
+                battery_pct
+            fi
+        }
 
-    function battery_pct_remaining() {
-      if [ ! $(battery_is_charging) ] ; then
-        battery_pct
-      else
-        echo "External Power"
-      fi
-    }
+        function battery_time_remaining() {
+            local smart_battery_status="$(ioreg -rc "AppleSmartBattery")"
+            if [[ $(echo $smart_battery_status | grep -c '^.*"ExternalConnected"\ =\ No') -eq 1 ]] ; then
+                timeremaining=$(echo $smart_battery_status | grep '^.*"AvgTimeToEmpty"\ =\ ' | sed -e 's/^.*"AvgTimeToEmpty"\ =\ //')
+                if [ $timeremaining -gt 720 ] ; then
+                    echo "::"
+                else
+                    echo "~$((timeremaining / 60)):$((timeremaining % 60))"
+                fi
+            else
+                echo "∞"
+            fi
+        }
 
-    function battery_time_remaining() {
-      if [[ $(acpi 2&>/dev/null | grep -c '^Battery.*Discharging') -gt 0 ]] ; then
-        echo $(acpi | cut -f3 -d ',')
-      fi
-    }
+        function battery_pct_prompt () {
+            if [[ $(ioreg -rc AppleSmartBattery | grep -c '^.*"ExternalConnected"\ =\ No') -eq 1 ]] ; then
+                b=$(battery_pct_remaining)
+                if [ $b -gt 50 ] ; then
+                    prompt_segment green white
+                elif [ $b -gt 20 ] ; then
+                    prompt_segment yellow white
+                else
+                    prompt_segment red white
+                fi
+                echo -n "$fg_bold[white]$HEART$(battery_pct_remaining)%%$fg_no_bold[white]"
+            else
+                echo "∞"
+            fi
+        }
 
-    b=$(battery_pct_remaining)
-    if [[ $(acpi 2&>/dev/null | grep -c '^Battery.*Discharging') -gt 0 ]] ; then
-      if [ $b -gt 40 ] ; then
-        prompt_segment green white
-      elif [ $b -gt 20 ] ; then
-        prompt_segment yellow white
-      else
-        prompt_segment red white
-      fi
-      echo -n "$fg_bold[white]$HEART$(battery_pct_remaining)%%$fg_no_bold[white]"
+        function battery_is_charging() {
+            [[ $(ioreg -rc "AppleSmartBattery"| grep '^.*"IsCharging"\ =\ ' | sed -e 's/^.*"IsCharging"\ =\ //') == "Yes" ]]
+        }
+
+    elif [[ "$OSTYPE" = linux*  ]] ; then
+
+        function battery_is_charging() {
+            ! [[ $(acpi 2>/dev/null | grep -c '^Battery.*Discharging') -gt 0 ]]
+        }
+
+        function battery_pct() {
+            if (( $+commands[acpi] )) ; then
+                echo "$(acpi 2>/dev/null | cut -f2 -d ',' | tr -cd '[:digit:]')"
+            fi
+        }
+
+        function battery_pct_remaining() {
+            if [ ! $(battery_is_charging) ] ; then
+                battery_pct
+            else
+                echo "External Power"
+            fi
+        }
+
+        function battery_time_remaining() {
+            if [[ $(acpi 2>/dev/null | grep -c '^Battery.*Discharging') -gt 0 ]] ; then
+                echo $(acpi 2>/dev/null | cut -f3 -d ',')
+            fi
+        }
+
+        function battery_pct_prompt() {
+            if [[ $(acpi 2>/dev/null | grep -c '^Battery.*Discharging') -gt 0 ]] ; then
+                b=$(battery_pct_remaining)
+                if [ $b -gt 50 ] ; then
+                    prompt_segment green white
+                elif [ $b -gt 20 ] ; then
+                    prompt_segment yellow white
+                else
+                    prompt_segment red white
+                fi
+                echo -n "$fg_bold[white]$HEART$(battery_pct_remaining)%%$fg_no_bold[white]"
+            else
+                echo "∞"
+            fi
+        }
+
+    else
+        # Empty functions so we don't cause errors in prompts
+        function battery_pct_remaining() {
+        }
+
+        function battery_time_remaining() {
+        }
+
+        function battery_pct_prompt() {
+        }
     fi
 
-  fi
+    battery_pct_prompt
+
 }
 
 # Git: branch/detached head, dirty status
