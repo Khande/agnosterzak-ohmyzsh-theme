@@ -88,15 +88,17 @@ prompt_context() {
 # Battery Level
 prompt_battery() {
     HEART='♥ '
-    
+
     if [[ "$OSTYPE" = darwin* ]] ; then
 
         function battery_pct() {
-            local smart_battery_status="$(ioreg -rc "AppleSmartBattery")"
-            typeset -F maxcapacity=$(echo $smart_battery_status | grep '^.*"MaxCapacity"\ =\ ' | sed -e 's/^.*"MaxCapacity"\ =\ //')
-            typeset -F currentcapacity=$(echo $smart_battery_status | grep '^.*"CurrentCapacity"\ =\ ' | sed -e 's/^.*CurrentCapacity"\ =\ //')
-            integer i=$(((currentcapacity/maxcapacity) * 100))
-            echo $i
+            # local smart_battery_status="$(ioreg -rc "AppleSmartBattery")"
+            # typeset -F maxcapacity=$(echo $smart_battery_status | grep '^.*"MaxCapacity"\ =\ ' | sed -e 's/^.*"MaxCapacity"\ =\ //')
+            # typeset -F currentcapacity=$(echo $smart_battery_status | grep '^.*"CurrentCapacity"\ =\ ' | sed -e 's/^.*CurrentCapacity"\ =\ //')
+            # integer i=$(((currentcapacity/maxcapacity) * 100))
+            # echo $i
+
+            echo $(pmset -g batt | grep -o '[0-9]*%' | tr -d %)
         }
 
         function plugged_in() {
